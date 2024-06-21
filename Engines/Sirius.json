@@ -4,7 +4,7 @@
     "source"  : "https://github.com/Mcthouacbb/Sirius",
 
     "build" : {
-        "path"      : "src",
+        "path"      : "",
         "compilers" : ["clang"],
         "cpuflags"  : ["AVX2", "FMA", "POPCNT"],
         "systems"   : ["Windows", "Linux"]
