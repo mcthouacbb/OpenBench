@@ -23,6 +23,11 @@
     ],
 
     "engines" : [
-        "Sirius"
+        "Sirius",
+        "Altair",
+        "Drofa",
+        "Winter",
+        "Laser",
+        "Stash"
     ]
 }

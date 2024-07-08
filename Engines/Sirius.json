@@ -13,7 +13,7 @@
     "test_presets" : {
 
         "default" : {
-            "base_branch"     : "master",
+            "base_branch"     : "main",
             "book_name"       : "Pohl.epd",
             "test_bounds"     : "[0.00, 5.00]",
             "test_confidence" : "[0.05, 0.05]",
@@ -35,7 +35,7 @@
 
         "Fixed_Nodes" : {
             "both_options"      : "Threads=1 Hash=8",
-            "both_time_control" : "N=40000"
+            "both_time_control" : "N=25000"
         }
     }
 }
