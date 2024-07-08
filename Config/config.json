@@ -25,9 +25,8 @@
     "engines" : [
         "Sirius",
         "Altair",
-        "Drofa",
         "Winter",
-        "Laser",
-        "Stash"
+        "Stash",
+        "Viridithas"
     ]
 }
