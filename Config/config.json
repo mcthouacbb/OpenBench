@@ -25,6 +25,7 @@
 
     "engines" : [
         "Sirius",
+        "Aquarii",
         "Altair",
         "Winter",
         "Stash",
