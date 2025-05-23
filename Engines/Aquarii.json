@@ -1,6 +1,6 @@
 {
     "private" : false,
-    "nps"     : 1300000,
+    "nps"     : 3000000,
     "source"  : "https://github.com/Mcthouacbb/Aquarii",
 
     "build" : {
