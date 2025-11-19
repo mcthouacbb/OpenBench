@@ -26,6 +26,7 @@ import django.contrib.auth
 
 import OpenBench.config
 import OpenBench.utils
+import OpenBench.model_utils
 
 from OpenBench.workloads.create_workload import create_workload
 from OpenBench.workloads.get_workload import get_workload
@@ -33,7 +34,7 @@ from OpenBench.workloads.modify_workload import modify_workload
 from OpenBench.workloads.verify_workload import verify_workload
 from OpenBench.workloads.view_workload import view_workload
 
-from OpenBench.config import OPENBENCH_CONFIG, OPENBENCH_STATIC_VERSION
+from OpenBench.config import OPENBENCH_CONFIG, OPENBENCH_CONFIG_CHECKSUM, OPENBENCH_STATIC_VERSION
 from OpenSite.settings import PROJECT_PATH
 
 from OpenBench.models import *
@@ -467,8 +468,12 @@ def workload(request, workload_type, pk, action=None):
     if action != None:
         return modify_workload(request, pk, action)
 
-    if not (workload := Test.objects.filter(id=pk).first()):
+    if not (workload := Test.objects.filter(id=int(pk)).first()):
         return redirect(request, '/index/', error='No such Workload exists')
+
+    # Trying to view a Tune as a Test, for example
+    if workload.workload_type_str() != workload_type:
+        return django.http.HttpResponseRedirect('/%s/%d/' % (workload.workload_type_str(), int(pk)))
 
     return view_workload(request, workload, workload_type.upper())
 
@@ -548,7 +553,7 @@ def scripts(request):
         return networks(request, engine, 'upload', name)
 
     if request.POST['action'] == 'CREATE_TEST':
-        return create_test(request)
+        return new_workload(request, "TEST")
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #                              CLIENT HOOK VIEWS                              #
@@ -570,6 +575,10 @@ def verify_worker(function):
         # Use the secret token as our soft verification
         if machine.secret != args[0].POST['secret']:
             return JsonResponse({ 'error' : 'Invalid Secret Token' })
+
+        # Prompt the worker to soft-restart if its config is out of date
+        if machine.info.get('OPENBENCH_CONFIG_CHECKSUM') != OPENBENCH_CONFIG_CHECKSUM:
+            return JsonResponse({ 'error' : 'Server Configuration Changed' })
 
         # Otherwise, carry on, and pass along the machine
         return function(*args, machine)
@@ -611,17 +620,16 @@ def client_worker_info(request):
     except UnableToAuthenticate:
         return JsonResponse({ 'error' : 'Bad Credentials' })
 
-    # Attempt to fetch the Machine, or create a new one
+    # Create a new Machine for this session
     info    = json.loads(request.POST['system_info'])
-    machine = OpenBench.utils.get_machine(info['machine_id'], user, info)
-
-    # Indicate invalid request
-    if not machine:
-        return JsonResponse({ 'error' : 'Bad Machine Id' })
+    machine = OpenBench.utils.get_machine('None', user, info)
 
     # Save the machine's latest information and Secret Token for this session
     machine.info   = info
     machine.secret = secrets.token_hex(32)
+
+    # Note the Config checksum at the time of init, in case it changes
+    machine.info['OPENBENCH_CONFIG_CHECKSUM'] = OPENBENCH_CONFIG_CHECKSUM
 
     # Tag engines that the Machine can build and/or run with binaries
     machine.info['supported'] = []
@@ -815,17 +823,14 @@ def api_networks(request, engine):
 
     if engine in OPENBENCH_CONFIG['engines'].keys():
 
-        if not (network := Network.objects.filter(engine=engine, default=True).first()):
-            return api_response({ 'error' : 'Engine does not have a default Network' })
-
-        default = {
-            'sha'    : network.sha256, 'name'    : network.name,
-            'author' : network.author, 'created' : str(network.created) }
+        default = None
+        if (network := Network.objects.filter(engine=engine, default=True).first()):
+            default = OpenBench.model_utils.network_to_dict(network)
 
         networks = [
-          { 'sha'    : network.sha256, 'name'    : network.name,
-            'author' : network.author, 'created' : str(network.created) }
-            for network in Network.objects.filter(engine=engine) ]
+            OpenBench.model_utils.network_to_dict(network)
+            for network in Network.objects.filter(engine=engine)
+        ]
 
         return api_response({ 'default' : default, 'networks' : networks })
 
@@ -848,6 +853,21 @@ def api_network_download(request, engine, identifier):
         return OpenBench.utils.network_download(request, engine, network)
 
     return api_response({ 'error' : 'Engine not found. Check /api/config/ for a full list' })
+
+@csrf_exempt
+def api_network_delete(request, engine, identifier):
+
+    if not api_authenticate(request):
+        return api_response({ 'error' : 'API requires authentication for this server' })
+
+    if not api_authenticate(request, require_enabled=True):
+        return api_response({ 'error' : 'API requires authentication for this endpoint' })
+
+    if not (network := OpenBench.utils.network_disambiguate(engine, identifier)):
+        return api_response({ 'error' : 'Network %s for Engine %s not found' % (identifier, engine) })
+
+    message, success = OpenBench.model_utils.network_delete(network)
+    return api_response({ 'success' if success else 'error' : message })
 
 @csrf_exempt
 def api_build_info(request):
