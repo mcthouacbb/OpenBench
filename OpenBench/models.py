@@ -18,7 +18,7 @@
 #                                                                             #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
-from django.db.models import CharField, IntegerField, BooleanField, FloatField
+from django.db.models import CharField, IntegerField, BigIntegerField, BooleanField, FloatField
 from django.db.models import JSONField, ForeignKey, DateTimeField, OneToOneField
 from django.db.models import CASCADE, PROTECT, Model, TextChoices
 from django.contrib.auth.models import User
@@ -191,6 +191,9 @@ class Test(Model):
 
     def as_nwld(self):
         return (self.games, self.wins, self.losses, self.draws)
+
+    def workload_type_str(self):
+        return {'SPSA' : 'tune', 'DATAGEN' : 'datagen'}.get(self.test_mode, 'test')
 
 class LogEvent(Model):
 
